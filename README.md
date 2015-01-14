@@ -86,10 +86,10 @@ $("#my-tabs-widget").tabs({
   navigateTabsByTabKey: false, // should both tab and arrow keys be used to navigate tabs
   expandPanelOnTabFocus: true, // should a panel be opened when it's tab has focus?
   focusPanelOnTabExpand: false, // should focus be set on the first focusable item in a panel when it is opened?
-  focusTabOnPanelBlur: false, // should focus be sent back to the tab when "Shift+Tab" key is pressed from first panel focusable
+  focusTabOnPanelBlur: false, // should focus be sent back to the tab when "Shif+Tab" key is pressed from first panel focusable
   tabsMultiSelectable: false, // can multiple panels be open at once?
-  tabsSelfClosable: false, // can an open panel be closed by it's own tab or only by opening another panel?
-  navigateTabGridByArrowKeys: false, // should up and down arrow keys be used to navigate across rows if tabs span multiple rows?
+  tabsSelfClosable: false, // can an open panel be closed by it's own tab or only by opening oanother panel?
+  navigateTabGridByArrowKeys: false, // should up and down arrow keys be used to navigate accros rows if tabs span multiple rows?
   navigateTabsAsCircularLoop: false, // should navigation keys loop to the other end when the end is reached in a group of tabs?
   scrollOnOpen: false, // should the browser window be scrolled to the top of a newly opened panel?
   updateLocationHash: false, // should the browser's location hash be updated when a panel is opened?
@@ -101,7 +101,7 @@ $("#my-tabs-widget").tabs({
   queueOpeningEffect: true, // should the opening effect be delayed till closing operations are complete
   sync: function(tabgroup){return null;}, // this is a function that will be called by setInterval. Use it to keep dynamic layouts in order.
   syncInterval: 0, // number of milliseconds between each calling of the sync function
-  
+
   // callbacks
   tabSelect: null,
   tabSelected: null,
@@ -112,20 +112,25 @@ $("#my-tabs-widget").tabs({
 
   // The "components" option allows for this widget to be applied to any variety of HTML structures. 
   // Each "$component" key represents an HTML DOM element that this widget will reference and manipulate
-  // Five properties are used to locate the "$component" elements in the HTML DOM.
-  // The first three, "selector", "selectorContext", and "selectorDepth" 
-  //  are used to define the jQuery selector used to locate the components directly in the DOM.
-  // Alternatively, "relatedby" and "relationship" are used to identify 
-  //  an aria relationship attribute on another DOM element in which this component's id is listed.
+  // Allowed values for "UIX selector" properties can be any jQuery selector or a key from this components{} object.
+  //  'element' is the default value for any "UIX selector", and will reference the element on which the widget is instantiated
   components: {
-    $tabList: { 
-      selector:"[role='tablist']",
-      relationship: "aria-owns",
+    $tabList: { // The $tabList component identifies the elements that "own" all $tab components
+      selector:"[role~='tablist']", // This "UIX Selector" value will select the elements for this component. 
+      selectorContext: "element", // This "UIX Selector" value will identify the context in which the above selection is made.
+      selectorDepth: null, // This "number" value represents the "depth" at which to search "context" for "selector". 
+                           // A value of 1+ will run `context.find(selector)` at the indicated child level. 
+                           // A value of 0 will run `context.filter(selector)` returning members of the context collection.
+                           // A value of null (default) will run `context.find(selector)`
+      relationship: "aria-owns", // This "string" value represents the name of an [aria relationship attribute](http://www.w3.org/TR/wai-aria/states_and_properties#attrs_relationships)
+      relatedby: "element", // This "UIX selector" value will identify the element on which the above relationship attribute is present.
+                            // The attribute should contain a space or comma separated list of IDs representing the elements of this component.
+                            // If present, the IDs found in this attribute will override the "selector..." properties in selecting elements for this component.
       classes: {
         expanded:"has-active",
       },
     },
-    $tabListItems: { 
+    $tabListItems: { // The $tabListItems component identifies the outermost "wrapper" element of each $tab component
       selector:"*",
       selectorContext: "$tabList",
       selectorDepth: 1,
@@ -135,8 +140,8 @@ $("#my-tabs-widget").tabs({
         expanded:"active",
       },
     },
-    $tabs: { 
-      selector:"[role='tab']",
+    $tabs: { // The $tabs component identifies the elements to be used as tabs (usually <a> links elements) 
+      selector:"[role~='tab']",
       selectorContext: "$tabList",
       relatedby: "$tabList",
       relationship: "aria-controls",
@@ -146,19 +151,19 @@ $("#my-tabs-widget").tabs({
         expanded:"active",
       },
     },
-    $panels: {
-      selector:"[role='tabpanel']",
+    $panels: { // The $panels component identifies the content elements that will be hidden and shown by eacn $tabs
+      selector:"[role~='tabpanel']",
       relatedby: "$tabs",
       relationship: "aria-controls",              
       classes: {
         expanded:"active",
       },
-      ajax: {
-        urlAttributeName:'data-ajax-url',
-        selectorAttributeName:'data-ajax-selector',
+      ajax: { // The ajax property configures if and how ajax content will be loaded into the elements of this component
+        urlAttributeName:'data-ajax-url', // where to find the URL of the document to be retrieved by ajax()
+        selectorAttributeName:'data-ajax-selector', // where to find the selector which will extract content from the documant returned by ajax()
       },
     },
-    $helpRegion: { 
+    $helpRegion: { // the $helpRegion is a planned feature, not implemented yet
       relatedby: "$tabList", 
       relationship: "aria-describedby",
     },
