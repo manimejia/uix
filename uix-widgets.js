@@ -28,20 +28,205 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
+ 
+(function( jQuery ) {  
 
+var rclass = /[\t\r\n\f]/g;
+var rnotwhite = /\S+/g;
 
-(function( $ ) {
-  
 // plugins
-$.fn.extend({
+jQuery.fn.extend({
   normalHref: function(){
     // jQuery support: IE7
     // IE7 doesn't normalize the href property when set via script (issue #9317)
     var anchor = this.get(0).cloneNode( false );
     return anchor.href(); 
+  },
+  
+  aria: function(attr,value,tokenOpp){
+    return this.attr('aria-'+attr,value,tokenOpp);
+  },
+  
+  attr: function( attr, value , tokenOpp ) {
+     var tokenFuncion = 
+         tokenOpp === 'add' ? 'attrAddToken' :
+         tokenOpp === 'remove' ? 'attrRemoveToken' :
+         tokenOpp === 'toggle' ? 'attrToggleToken' :
+         tokenOpp === 'has' ? 'attrHasToken' :
+         null;
+     if( tokenFuncion ){
+       return this[tokenFuncion](attr,value);
+     }
+    return jQuery.access( this, jQuery.attr, attr, value, value !== undefined );
+  },
+
+  attrAddToken: function( attr, value ) {
+    var values, elem, curValue, newValue, j, finalValue, getValue,
+      attrIsString = typeof attr === "string" && attr,
+      valueIsString = typeof value === "string" && value,
+      i = 0,
+      len = this.length;
+
+    if (attrIsString && jQuery.isFunction( value ) ) {
+      return this.each(function( j ) {
+        jQuery( this ).attrAddToken( attr, value.call( this, j, this.getAttribute(attr) ) );
+      });
+    }
+
+    if (attrIsString && valueIsString ) {
+      // The disjunction here is for better compressibility (see removeClass)
+      values = ( value || "" ).match( rnotwhite ) || [];
+
+      for ( ; i < len; i++ ) {
+        elem = this[ i ];
+        getValue = elem.getAttribute(attr);
+        curValue = elem.nodeType === 1 && ( getValue ?
+          ( " " + getValue + " " ).replace( rclass, " " ) :
+          " "
+        );
+
+        if ( curValue ) {
+          j = 0;
+          while ( (newValue = values[j++]) ) {
+            if ( curValue.indexOf( " " + newValue + " " ) < 0 ) {
+              curValue += newValue + " ";
+            }
+          }
+
+          // only assign if different to avoid unneeded rendering.
+          finalValue = jQuery.trim( curValue );
+          if ( getValue !== finalValue ) {
+            elem.setAttribute(attr,finalValue);
+          }
+        }
+      }
+    }
+
+    return this;
+  },
+
+  attrRemoveToken: function( attr, value ) {
+    var values, elem, curValue, newValue, j, finalValue, getValue,
+      attrIsString = typeof attr === "string" && attr,
+      valueIsString = arguments.length === 1 || typeof value === "string" && value,
+      i = 0,
+      len = this.length;
+
+    if ( attrIsString && jQuery.isFunction( value ) ) {
+      return this.each(function( j ) {
+        jQuery( this ).removeClass( value.call( this, j, this.getAttribute(attr) ) );
+      });
+    }
+    if ( attrIsString && valueIsString ) {
+      values = ( value || "" ).match( rnotwhite ) || [];
+
+      for ( ; i < len; i++ ) {
+        elem = this[ i ];
+        getValue = elem.getAttribute(attr);
+        // This expression is here for better compressibility (see addClass)
+        curValue = elem.nodeType === 1 && ( getValue ?
+          ( " " + getValue + " " ).replace( rclass, " " ) :
+          ""
+        );
+
+        if ( curValue ) {
+          j = 0;
+          while ( (newValue = values[j++]) ) {
+            // Remove *all* instances
+            while ( curValue.indexOf( " " + newValue + " " ) > -1 ) {
+              curValue = curValue.replace( " " + newValue + " ", " " );
+            }
+          }
+
+          // Only assign if different to avoid unneeded rendering.
+          finalValue = value ? jQuery.trim( curValue ) : "";
+          if ( getValue !== finalValue ) {
+            elem.setAttribute(attr,finalValue);
+          }
+        }
+      }
+    }
+
+    return this;
+  },
+
+  attrToggleToken: function( attr, value, stateVal ) {
+    var typeOfAttr = typeof attr, 
+        typeOfValue = typeof value;
+
+    if ( typeof stateVal === "boolean" && typeOfValue === "string" &&  typeOfAttr === "string" ) {
+      return stateVal ? this.attrAddToken( attr, value ) : this.attrRemoveToken( attr, value );
+    }
+
+    if ( typeOfAttr === "string" && jQuery.isFunction( value ) ) {
+      return this.each(function( i ) {
+        jQuery( this ).attrToggleToken(
+          attr, value.call(this, i, this.getAttribute(attr), stateVal), stateVal
+        );
+      });
+    }
+
+    return this.each(function() {
+      if ( typeOfAttr === "string" && typeOfValue === "string" ) {
+        // Toggle individual class names
+        var newValue,
+          i = 0,
+          self = jQuery( this ),
+          values = value.match( rnotwhite ) || [],
+          getValue, finalValue;
+
+        while ( (newValue = values[ i++ ]) ) {
+          // Check each className given, space separated list
+          if ( self.attrHasToken( attr, newValue ) ) {
+            self.attrRemoveToken( attr, newValue );
+          } else {
+            self.attrAddToken( attr, newValue );
+          }
+        }
+
+      // Toggle whole class name
+      } else if ( typeOfAttr === "string" && value === undefined || typeOfValue === "boolean" ) {
+        getValue = elem.getAttribute(attr);
+        if ( getValue ) {
+          // store className if set
+          jQuery.data( this, "__"+attr+"Value__", getValue );
+        }
+
+        // If the element has a class name or if we're passed `false`,
+        // then remove the whole classname (if there was one, the above saved it).
+        // Otherwise bring back whatever was previously saved (if anything),
+        // falling back to the empty string if nothing was stored.
+        finalValue = getValue || value === false ?
+          "" :
+          jQuery.data( this, "__"+attr+"Value__" ) || "";
+        this.setAttribute(attr,finalValue);
+      }
+    });
+  },
+
+  attrHasToken: function( attr, value ) {
+    var attr = typeof attr === "string" ? attr : false,
+        value = typeof value === "string" ? " " + value + " " : false,
+      i = 0,
+      l = this.length;
+    if(attr && value){
+      for ( ; i < l; i++ ) {
+        if ( this[i].nodeType === 1 &&
+          (" " + this[i].getAttribute(attr) + " ").replace(rclass, " ").indexOf( value ) > -1 ) {
+
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 });
+}(jQuery));
 
+
+(function( $ ) {
+  
 // define uix common fiunctionality
 $.uix = $.uix || {};
 
@@ -66,7 +251,7 @@ $.extend( $.uix, {
       $('[id][data-'+dataAttributeName+']',$context).each(function(){
         var options = $(this).data(dataAttributeName); 
         options = !options ? {} : options;
-        $(this).removeAttr('data-'+dataAttributeName);
+        // $(this).removeAttr('data-'+dataAttributeName);
         options.ajaxPanelContentLoaded = function(event,uix){
           // console.log('Calling ajaxPanelContentLoaded(event,uix)');
           // console.log('event : %O',event);
@@ -164,24 +349,25 @@ $.widget( "uix.tabs", {
 
     // The "components" option allows for this widget to be applied to any variety of HTML structures. 
     // Each "$component" key represents an HTML DOM element that this widget will reference and manipulate
-    // Five properties are used to locate the "$component" elements in the HTML DOM.
-    // The first three, "selector", "selectorContext", and "selectorDepth" 
-    //  are used to define the jQuery selector used to locate the components directly in the DOM.
-    // Alternatively, "relatedby" and "relationship" are used to identify 
-    //  an aria relationship attribute on another DOM element in which this component's id is listed.
+    // Allowed values for "UIX selector" properties can be any jQuery selector or a key from this components{} object.
+    //  'element' is the default value for any "UIX selector", and will reference the element on which the widget is instantiated
     components: {
-      $tabSet: {
-        selector: "[data-uix-tabset]",
-        selectorDepth: 0,
-      },
-      $tabList: { 
-        selector:"[role='tablist']",
-        relationship: "aria-owns",
+      $tabList: { // The $tabList component identifies the elements that "own" all $tab components
+        selector:"[role~='tablist']", // This "UIX Selector" value will select the elements for this component. 
+        selectorContext: "element", // This "UIX Selector" value will identify the context in which the above selection is made.
+        selectorDepth: null, // This "number" value represents the "depth" at which to search "context" for "selector". 
+                             // A value of 1+ will run `context.find(selector)` at the indicated child level. 
+                             // A value of 0 will run `context.filter(selector)` returning members of the context collection.
+                             // A value of null (default) will run `context.find(selector)`
+        relationship: "aria-owns", // This "string" value represents the name of an [aria relationship attribute](http://www.w3.org/TR/wai-aria/states_and_properties#attrs_relationships)
+        relatedby: "element", // This "UIX selector" value will identify the element on which the above relationship attribute is present.
+                              // The attribute should contain a space or comma separated list of IDs representing the elements of this component.
+                              // If present, the IDs found in this attribute will override the "selector..." properties in selecting elements for this component.
         classes: {
           expanded:"has-active",
         },
       },
-      $tabListItems: { 
+      $tabListItems: { // The $tabListItems component identifies the outermost "wrapper" element of each $tab component
         selector:"*",
         selectorContext: "$tabList",
         selectorDepth: 1,
@@ -191,8 +377,8 @@ $.widget( "uix.tabs", {
           expanded:"active",
         },
       },
-      $tabs: { 
-        selector:"[role='tab']",
+      $tabs: { // The $tabs component identifies the elements to be used as tabs (usually <a> links elements) 
+        selector:"[role~='tab']",
         selectorContext: "$tabList",
         relatedby: "$tabList",
         relationship: "aria-controls",
@@ -202,20 +388,19 @@ $.widget( "uix.tabs", {
           expanded:"active",
         },
       },
-      $panels: {
-        selector:"[role='tabpanel']",
+      $panels: { // The $panels component identifies the content elements that will be hidden and shown by eacn $tabs
+        selector:"[role~='tabpanel']",
         relatedby: "$tabs",
         relationship: "aria-controls",              
         classes: {
           expanded:"active",
         },
-        ajax: {
-          // element: new $.uix.selector("$panels"),
-          urlAttributeName:'data-ajax-url',
-          selectorAttributeName:'data-ajax-selector',
+        ajax: { // The ajax property configures if and how ajax content will be loaded into the elements of this component
+          urlAttributeName:'data-ajax-url', // where to find the URL of the document to be retrieved by ajax()
+          selectorAttributeName:'data-ajax-selector', // where to find the selector which will extract content from the documant returned by ajax()
         },
       },
-      $helpRegion: { 
+      $helpRegion: { // the $helpRegion is a planned feature, not implemented yet
         relatedby: "$tabList", 
         relationship: "aria-describedby",
       },
@@ -472,25 +657,45 @@ $.uix.tabs.prototype._processComponents = function() {
   // add aria attributes to the tabgroup container 
   widget.element.attr('aria-multiselectable', widget.options.tabsMultiSelectable); 
 
-  // add aria attributes to the panels and hide  them
-  widget.$panels.attr('aria-hidden', 'true').hide(); 
+  // add aria attributes to the tablist
+  widget.$tabList.attr('role', 'tablist', 'add'); 
 
+  // add aria attributes to the panels and hide  them
+  widget.$panels.uniqueId().attr('role', 'tabpanel', 'add').aria('hidden', 'true').hide().each(
+    function(){
+      // TODO if panel is not controlled by a tab then what to do?
+      // do nothing, OR 
+      // scan all tabs for the first missing controls attribute, OR
+      // something else?
+    }); 
+
+  // add aria attributes to the tabs
   // for all tabs that control a panel...
   // swap tab href values for the aria-controls value
   //  (href value might be pointing to URL of remote content for graceful degradation)
   // set aria-expanded to false, if it's not already set
   // set initial tabindex 
-  widget.$tabs.filter('[aria-controls]').each(function(index,element){
-    var $tab = $(this);
-    if($tab.attr('href')) $tab.attr('href','#'+$tab.attr('aria-controls'));
-    if($tab.attr('aria-expanded') != 'true') $tab.attr('aria-expanded','false');
-    widget.setTabIndex($tab);
-  });
-
+  widget.$tabs.uniqueId().attr('role', 'tab', 'add').each(
+    function(index,tab){
+      var $tab = $(this),
+          $tablist = widget.$tabList.has($tab);
+      if($tablist.length === 0){
+        // TODO which tablist should the tab be owned by
+        // this is not a foolproof check for the closest tablist parent or aunt
+        $tablist = $tab.closest(':has([role="tablist"])').find('[role="tablist"]').first();
+        $tablist.aria('owns',$tab.id);
+      }
+      if($tab.attr('[aria-controls]')){
+        if($tab.attr('href')) $tab.attr('href','#'+$tab.attr('aria-controls'));
+        if($tab.attr('aria-expanded') != 'true') $tab.attr('aria-expanded','false');
+        widget.setTabIndex($tab);
+      }
+    });
+ 
   // if there is a tab to activate, 
   // set focus to it, expand it's panel, and set tabindex
   if(expandedId){
-       $expandedTab = widget.$tabs.filter('#'+expandedId+',[aria-controls='+expandedId+']')
+       $expandedTab = widget.$tabs.filter('#'+expandedId+',[aria-controls~='+expandedId+']')
     }
   if($expandedTab.length === 0){
        $expandedTab = widget.$tabs.filter('[aria-controls][aria-expanded="true"]')
@@ -517,9 +722,9 @@ $.uix.tabs.prototype._processComponents = function() {
 $.uix.tabs.prototype.initRemoteTabLinks = function($element){
   if(!$element || $element.length > 0) var $element = $('body');
   var widget = this;
-  $element.find($('a[role="link"],a:not([role])')).each(function(){
-    var $targetTab = $('a[role="tab"][aria-controls="'+this.hash.substring(1)+'"]');
-    if(widget.$tabs.is($targetTab)){
+  $element.find($('a[role~="link"],a:not([role])')).each(function(){
+    var $targetTab = widget.$tabs.filter('[aria-controls~="'+this.hash.substring(1)+'"]');
+    if($targetTab.length){
       $(this).click(function(e){
         $targetTab.click()
         e.preventDefault();
@@ -636,8 +841,7 @@ $.uix.tabs.prototype.hidePanels = function($panels){
   var effectOptions = $.extend(true, {}, this.options.effectOptions);
   effectOptions.complete = function(){
       var $thisPanel = $(this);
-      var thisPanelId = $thisPanel.attr('id');
-      var $thisPanelTab = $('[role="tab"][aria-controls="'+thisPanelId+'"]');
+      var $thisPanelTab = widget.getPanelTab($thisPanel);
       $thisPanel.attr('aria-hidden', 'true').removeClass('active');
       $thisPanelTab.attr('aria-expanded', 'false').attr('aria-selected', 'false').removeClass('active');//.attr('tabindex', '-1'); 
     };
@@ -761,7 +965,7 @@ $.uix.tabs.prototype.effectFunction = function(show){
       return $tab.attr('aria-controls') != '' ? true : false;
     }
     $.uix.tabs.prototype.getPanelTab = function($panel){
-      return this.$tabs.filter('[aria-controls="'+$panel.attr('id')+'"]');
+      return this.$tabs.filter('[aria-controls~="'+$panel.attr('id')+'"]');
     }
     $.uix.tabs.prototype.getExpandedPanels = function(){
       return this.$panels.filter('[aria-hidden="false"]');
@@ -1164,7 +1368,7 @@ $.uix.tabs.prototype.effectFunction = function(show){
       switch (e.keyCode) { 
         case $.ui.keyCode.ENTER: 
         case $.ui.keyCode.SPACE: 
-          if(!$tab.attr('aria-controls')) return true;
+          if(!this.hasTabPanel($tab)) return true;
         case $.ui.keyCode.LEFT: 
         case $.ui.keyCode.UP: 
         case $.ui.keyCode.RIGHT: 
@@ -1211,7 +1415,7 @@ $.uix.tabs.prototype.effectFunction = function(show){
       // make clicked tab navigable 
       //$tab.attr('tabindex', '0'); 
 
-      if(!$tab.attr('aria-controls')) return true;
+      if(!this.hasTabPanel($tab)) return true;
 
       // Expand the new panel 
       this.togglePanel($tab); 
@@ -1285,7 +1489,7 @@ $.uix.tabs.prototype.effectFunction = function(show){
       } 
 
       // get the jQuery object of the tab 
-      var $tab = this.$tabs.filter('[aria-controls="'+$panel.attr('id')+'"]'); 
+      var $tab = this.getTabFromPanel($panel); 
 
       switch (e.keyCode) { 
         case $.ui.keyCode.TAB: { 
@@ -1502,6 +1706,5 @@ $.uix.tabs.prototype.effectFunction = function(show){
             document.body.scrollLeft = scrollH;
         }
     }
-
 
 }(jQuery))
