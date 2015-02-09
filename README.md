@@ -47,7 +47,7 @@ Download and include the UIX Widget Library and required [jQuery][JQ] and [jQuer
 </html>
 ```
 
-Instantiate the widget behavior on existing HTML structures, by adding a `data-[widget]` attribute.  This attribute may contain a value of space separated `configTokens`, which will be used to apply configuration presets to the options of this widget instance. Any additional `data-[widget]-[option]` attributes are uses to further tweak the options of this widget instance.
+Instantiate the widget behavior on existing HTML structures, by adding a `data-[widget]` attribute.  This attribute may contain a value of space separated `tokens`, which will be used to apply configuration presets to the options of this widget instance. Any additional `data-[widget]-[option]` attributes are uses to further tweak the options of this widget instance.
 
 ```html
 <div id="#my-tabs-widget" data-tabs="token token" data-tabs-[option]="value" >...</div>
@@ -57,7 +57,7 @@ or the standard [jQuery UI API for instantiating widgets][JQUIAPI], in which the
 
 ```javascript
 $("#my-tabs-widget").tabs({
-  configTokens:["token","token"],
+  tokens:["token","token"],
   option:"value",
   ...
   });
@@ -112,7 +112,7 @@ $("#my-tabs-widget").tabs();
 is equivalent to calling
 ```javascript
 $("#my-tabs-widget").tabs({
-  configTokens: [], // set this to the string identifier of a settings preset to use ... see : getCreateOptions().
+  tokens: [], // set this to the string identifier of a settings preset to use ... see : getCreateOptions().
   navigateTabsByTabKey: false, // should both tab and arrow keys be used to navigate tabs
   expandPanelOnTabFocus: true, // should a panel be opened when it's tab has focus?
   focusPanelOnTabExpand: false, // should focus be set on the first focusable item in a panel when it is opened?
@@ -224,7 +224,7 @@ Adding
 ```
 Or Calling
 ```js
-$("#my-accordion-widget").tabs({configTokens:["accordion"]});
+$("#my-accordion-widget").tabs({tokens:["accordion"]});
 ```
 is equivalent to calling
 ```js
@@ -252,12 +252,12 @@ Adding
 ```
 Or Calling
 ```js
-$("#my-accordionGrid-widget").tabs({configTokens:["accordionGrid"]});
+$("#my-accordionGrid-widget").tabs({tokens:["accordionGrid"]});
 ```
 is equivalent to calling
 ```js
-$("#my-accordionGrid-widget").accordion({
-  configTokens : ["accordion"],
+$("#my-accordionGrid-widget").tabs({
+  tokens : ["accordion"],
   navigateTabGridByArrowKeys: true,
   scrollOnOpen: true,
   updateLocationHash: true,

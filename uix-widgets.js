@@ -290,8 +290,8 @@ $.extend( $.uix, {
         //dataOptions["defaults"] = data[key].split(' ');
         $.extend(true,dataOptions,
           typeof data[key] === 'object' ? data[key] :
-          typeof data[key] === 'string' ? {"configTokens":data[key].split(' ')} :
-          typeof data[key] === 'array' ? {"configTokens":data[key]} :
+          typeof data[key] === 'string' ? {"tokens":data[key].split(' ')} :
+          typeof data[key] === 'array' ? {"tokens":data[key]} :
           {}
         );
       }
@@ -328,18 +328,18 @@ $.extend( $.uix, {
     }
     return dataKeyMap;
   },
-  getWidgetConfiguration : function(widget,configTokens){
+  getWidgetConfiguration : function(widget,tokens){
     widget = typeof widget === 'string' && $.uix[widget] ? $.uix[widget].prototype : 
              typeof widget === 'object' && widget.options && widget.configurations ? widget :
              {};
-    configTokens = configTokens && configTokens.length ? configTokens : widget.options.configTokens || [];
+    tokens = tokens && tokens.length ? tokens : widget.options.tokens || [];
     var configurations = widget.configurations || {},
         configurationSet = {},
         widgetConfiguration = {};
-    for(index in configTokens){
-      configurationSet = configurations[configTokens[index]] || {};
-      if(configurationSet.configTokens && configurationSet.configTokens.length){
-        $.extend(true,configurationSet,$.uix.getWidgetConfiguration(widget,configurationSet.configTokens));
+    for(index in tokens){
+      configurationSet = configurations[tokens[index]] || {};
+      if(configurationSet.tokens && configurationSet.tokens.length){
+        $.extend(true,configurationSet,$.uix.getWidgetConfiguration(widget,configurationSet.tokens));
       }
       $.extend(true,widgetConfiguration,configurationSet);
     }
@@ -558,7 +558,7 @@ $.uix.tabs.prototype.templates = $.extend(true, {} , $.uix.templates , {
 
 $.uix.tabs.prototype.configurations = {
   "default":{
-    configTokens: [], // set this to the string identifier of a settings preset to use ... see : getCreateOptions().
+    tokens: [], // set this to the string identifier of a settings preset to use ... see : getCreateOptions().
     navigateTabsByTabKey: false, // should both tab and arrow keys be used to navigate tabs
     expandPanelOnTabFocus: true, // should a panel be opened when it's tab has focus?
     focusPanelOnTabExpand: false, // should focus be set on the first focusable item in a panel when it is opened?
@@ -729,7 +729,7 @@ $.uix.tabs.prototype.configurations = {
      queueOpeningEffect: false,
   },// end accordio defaults
   "accordionGrid" : {
-    configTokens : ["accordion"],
+    tokens : ["accordion"],
     navigateTabGridByArrowKeys: true,
     scrollOnOpen: true,
     updateLocationHash: true,
@@ -868,7 +868,7 @@ $.uix.tabs.prototype._create = function() {
   
   var instanceOptions = this.options;
   var defaultConfiguration = this.configurations["default"];
-  var widgetConfiguration = $.uix.getWidgetConfiguration(this); // resolve this.options.configTokens array of configuration keys
+  var widgetConfiguration = $.uix.getWidgetConfiguration(this); // resolve this.options.tokens array of configuration keys
   this.options = $.extend(true,{},defaultConfiguration,widgetConfiguration);
   // using this.option() function allows instance options to be set using dot notation {"object.key":"value"}
   for(optionKey in instanceOptions){
