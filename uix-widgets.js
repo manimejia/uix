@@ -645,11 +645,9 @@ $.uix.tabs.prototype.configurations = {
       },
       next:{ // the $next component identifies the button element that will activate the "next" tab in the $tablist.
         selector:"button[name='next'],[role~='button'][name='next']",
-        selectorContext: "$tabList",
       },
       previous:{ // the $previous component identifies the button element that will activate the "previous" tab in the $tablist.
         selector:"button[name='previous'],[role~='button'][name='previous']",
-        selectorContext: "$tabList",
       },
       helpRegion: { // the $helpRegion is a planned feature, not implemented yet
         relatedby: "$tabList", 
@@ -1058,10 +1056,10 @@ $.uix.tabs.prototype._processComponents = function() {
     widget.$next.click(function(event){
       var $currentTab = widget.getExpandedTabs();
       var $nextTab = widget.getNextTab($currentTab);
-      console.group('Calling widget.$next.click() :');
-      console.log('$currentTab : %O',$currentTab);
-      console.log('$nextTab : %O',$nextTab);
-      console.groupEnd();
+      // console.group('Calling widget.$next.click() :');
+      // console.log('$currentTab : %O',$currentTab);
+      // console.log('$nextTab : %O',$nextTab);
+      // console.groupEnd();
       widget.switchTabs($currentTab,$nextTab);
       });
   }
@@ -1069,10 +1067,10 @@ $.uix.tabs.prototype._processComponents = function() {
     widget.$previous.click(function(event){
       var $currentTab = widget.getExpandedTabs();
       var $previousTab = widget.getPreviousTab($currentTab);
-      console.group('Calling widget.$previous.click() :');
-      console.log('$currentTab : %O',$currentTab);
-      console.log('$previousTab : %O',$previousTab);
-      console.groupEnd();
+      // console.group('Calling widget.$previous.click() :');
+      // console.log('$currentTab : %O',$currentTab);
+      // console.log('$previousTab : %O',$previousTab);
+      // console.groupEnd();
       widget.switchTabs($currentTab,$previousTab);
       });
   }
@@ -1157,11 +1155,11 @@ $.uix.tabs.prototype.switchTabs = function($curTab, $newTab, expand) {
 // @return N/A 
 // 
 $.uix.tabs.prototype.togglePanel = function($tab,expand) { 
-  console.group('Calling togglePanel($tab,expand):');
+  //console.group('Calling togglePanel($tab,expand):');
   if(this.$tabs.index($tab) === -1) return false;
   expand = expand == null ? null : expand ? true : false;
-  console.log('$tab : %O',$tab);
-  console.log('expand : ',expand);
+  //console.log('$tab : %O',$tab);
+  //console.log('expand : ',expand);
   var widget = this;
   var $tabWrapper = this.$tabListItems.has($tab);
   var $panel = this.getTabPanel($tab); 
@@ -1171,10 +1169,10 @@ $.uix.tabs.prototype.togglePanel = function($tab,expand) {
   // var effectOptions = $.extend(true, {}, this.options.effectOptions);
   // var openingDelay = 0;
   var panelsToClose = [];
-  console.log('$tabWrapper : %O',$tabWrapper);
-  console.log('$panel : %O',$panel);
-  console.log('panelHidden : ',panelHidden);
-  console.log('tabsSelfClosable : ',this.options.tabsSelfClosable);
+  // console.log('$tabWrapper : %O',$tabWrapper);
+  // console.log('$panel : %O',$panel);
+  // console.log('panelHidden : ',panelHidden);
+  // console.log('tabsSelfClosable : ',this.options.tabsSelfClosable);
 
   if(panelHidden == false && this.options.tabsSelfClosable == true && !expand){
      $panelsToClose = $panel;
@@ -1182,7 +1180,7 @@ $.uix.tabs.prototype.togglePanel = function($tab,expand) {
   }else if(panelHidden == true && this.options.tabsMultiSelectable == false){
      $panelsToClose = this.getExpandedPanels();
   }
-  console.log('$panelsToClose : %O',$panelsToClose);
+  //console.log('$panelsToClose : %O',$panelsToClose);
 
   if($panelsToClose.length > 0){ 
     if($panelsToClose.is($panel) && widget.options.scrollOnOpen){ 
@@ -1203,25 +1201,27 @@ $.uix.tabs.prototype.togglePanel = function($tab,expand) {
     //$panel.attr('aria-hidden', 'false').addClass('active'); 
     //$panel.slideDown(100); 
   }
-  console.groupEnd();
+  //console.groupEnd();
 } // end togglePanel() 
 
 $.uix.tabs.prototype.showPanel = function($panel){
+  console.group('calling : showPanel()') 
   var widget = this,
-      $tab = this.getPanelTab($panel),
-      effectOptions = $.extend(true, {}, this.options.effectOptions),
+      $tab = widget.getPanelTab($panel),
+      tabClass = widget.options.components.tabs.classes.expanded || 'expanded',
+      panelClass = widget.options.components.panels.classes.expanded || 'expanded',
+      effectOptions = $.extend(true, {}, widget.options.effectOptions),
       // TODO should use animation API to check if closing animation is still running instead of guessing...
-      openingDelay =  this.getExpandedPanels().length > 0 && 
+      openingDelay =  widget.getExpandedPanels().length > 0 && 
                       widget.options.queueOpeningEffect === true ? 
                       effectOptions.duration || 400 : 0;
-
+  console.log('widget : %O',widget);
+  console.log('tabClass : ',tabClass);
   effectOptions.complete = function(){
-     var expandedTabClass = widget.options.components.tabs.classes.expanded || 'expanded';
-     var expandedPanelClass = widget.options.components.panels.classes.expanded || 'expanded';
      if(widget.options.scrollOnOpen) $.uix.scrollToElement($panel,false);
      if(widget.options.updateLocationHash) window.location.hash = $panel.attr('id');
-     $panel.attr('aria-hidden', 'false').addClass(expandedTabClass);
-     $tab.attr('aria-expanded', 'true').attr('aria-selected', 'true').addClass(expandedPanelClass);//.attr('tabindex', '0'); 
+     $panel.attr('aria-hidden', 'false').toggleClass(panelClass,true);
+     $tab.attr('aria-expanded', 'true').attr('aria-selected', 'true').toggleClass(tabClass,true);//.attr('tabindex', '0'); 
      //if(widget.options.focusPanelOnTabExpand) $panel.find(':focusable').first().focus();
     if(widget.options.focusPanelOnTabExpand) {
       widget.setTabIndex($panel,0);
@@ -1229,22 +1229,23 @@ $.uix.tabs.prototype.showPanel = function($panel){
     }
    };
   this.effectShow($panel,effectOptions,openingDelay);
+  console.groupEnd();
 }
 
 $.uix.tabs.prototype.hidePanels = function($panels){
   var widget = this;
-  var effectOptions = $.extend(true, {}, this.options.effectOptions);
+      tabClass = widget.options.components.tabs.classes.expanded || 'expanded',
+      panelClass = widget.options.components.panels.classes.expanded || 'expanded',
+      effectOptions = $.extend(true, {}, widget.options.effectOptions);
   if(widget.options.focusPanelOnTabExpand) {
     $($panels).blur();
     widget.setTabIndex($panels,-1);
   }
   effectOptions.complete = function(){
       var $thisPanel = $(this);
-      var $thisPanelTab = widget.getPanelTab($thisPanel);
-      var expandedTabClass = widget.options.components.tabs.classes.expanded || 'expanded';
-      var expandedPanelClass = widget.options.components.panels.classes.expanded || 'expanded';
-      $thisPanel.attr('aria-hidden', 'true').removeClass(expandedPanelClass);
-      $thisPanelTab.attr('aria-expanded', 'false').attr('aria-selected', 'false').removeClass(expandedTabClass);//.attr('tabindex', '-1'); 
+      var $thisTab = widget.getPanelTab($thisPanel);
+      $thisPanel.attr('aria-hidden', 'true').toggleClass(panelClass,false);
+      $thisTab.attr('aria-expanded', 'false').attr('aria-selected', 'false').toggleClass(tabClass,false);//.attr('tabindex', '-1'); 
     };
   this.effectHide($panels,effectOptions);
 }
