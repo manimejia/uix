@@ -48,42 +48,72 @@ Download and include the UIX Widget Library and required [jQuery][JQ] and [jQuer
 </html>
 ```
 
-Instantiate the widget behavior on existing HTML structures, using the custom `data-[widgetName]` attributes,
+Instantiate the widget behavior on existing HTML structures, by adding a `data-[widget]` attribute.  This attribute may contain a value of space separated `tokens`, which will be used to apply configuration presets to the options of this widget instance. Any additional `data-[widget]-[option]` attributes are uses to further tweak the options of this widget instance.
 
 ```html
-<div id='#my-tabs-widget' data-tabs='{"key":"value"}' >...</div>
+<div id="#my-tabs-widget" data-tabs="token token" data-tabs-[option]="value" >...</div>
 ```
 
-or the standard [jQuery UI API for instantiating widgets][JQUIAPI]
+or the standard [jQuery UI API for instantiating widgets][JQUIAPI], in which the widget is passed options 
 
 ```javascript
-$("#my-tabs-widget").tabs({"key":"value"});
+$("#my-tabs-widget").tabs({
+  tokens:["token","token"],
+  option:"value",
+  ...
+  });
 ```
 
-Passing an *options* object in either case is purely optional, and only illustrated here for demonstration purposes. See below for available options for each widget. 
-
-> **IMPORTANT:**
-
-> "*When the `data-` attribute is an object (starts with '{') or array (starts with '[') then `jQuery.parseJSON` is used to parse the string; it must follow [valid JSON syntax][JSON] including **quoted property names**. If the value isn't parseable as a JavaScript value, it is left as a string.*"
-
-> See [jQuery : HTML5 data-* Attributes][JQDATA]
+Assigning a value to the "data-[widget]" HTML attribute, or having any "data-[widget]-[option]" HTML attributes present, or passing an *options* object via javascript are all purely optional methods of configuring the widget options. They are only illustrated here for demonstration purposes. See below for a list of the available options to pass for each widget. 
 
 
 ## Available Widgets and Configurations
 
-Currently there are four widgets available in the UIX library. Each one can be instantiated via a custom `data-` attribute or the jQuery UI widgets API, as described above. 
+Currently there is one widget available in the UIX library, the "tabs" widget. This can be configured in a number of ways via custom `data-` attributes or the jQuery UI widgets API, as described above. 
 
-### Tabs Widget (`.tabs()`)
+### Tabs Widget
 
-Your basic *Tabs* behavior can be applied to any HTML structure. Tabs can be displayed in any orientation (vertical or horizontal) and appear anywhere in the HTML document in relation to the tab panels they control. As with all UIX widgets, style and structure are entirely up to the designer. Bellow are the default (and all available) options for the Tabs widget:
+This is a very versatile widget for adding generic *tab switching* behavior to any collection of HTML elements. This behavior can be summarized as follows: 
+ 1. A collection of elements is identified as being `tabs`
+ 2. Another collection is identified as being `panels`. 
+ 3. The `tabs` elements control the hiding and showing of the `panel` elements. 
 
-Calling
+The versatility of this widget is exemplified by the preset configurations that are available. 
+ - *tabs* (default) - used to control a typical tabbed layout, where:
+    - The `tabs` and `panels` are listed separately in the HTML structure.
+    - A `panel` is toggled when it's `tab` is clicked
+    - only one `panel` can be displayed at a time
+ - *accordion* - used to control a typical accordion layout, where:
+    - the `tabs` and `panels` are listed *inline* (one after the other) in the HTML structure
+    - A `panel` is toggled when it's `tab` is clicked
+    - multiple `panels` may be displayed at a time
+    - `panels` are animated on opening and closing
+ - *accordionGrid* - used to control a layout similar to "google image search", where:
+    - all the *accordion* behaviors are applied
+    - A `panel` will be opened by default, if it's ID appears as the URL `location.hash`
+    - the window will scroll to the location of a newly opened `panel`
+    - The parent element of an active `tab`/`panel` pair will have it's `padding` modified to accommodate the `panel` height, even if it changes.
+ - *slider* - used to control a typical image "carousel" or content "slider", where:
+    - A `panel` is toggled when it's `tab` is clicked
+    - only one `panel` can be displayed at a time
+    - `panels` may be navigated as a continuous loop
+
+#### Tabs (Default Tabs Widget Configuration)
+
+Tabs can be displayed in any orientation (vertical or horizontal) and appear anywhere in the HTML document in relation to the tab panels they control. As with all UIX widgets, style and structure are entirely up to the designer. Bellow are the default (and all available) options for the Tabs widget:
+
+Adding
+```html
+<div id="my-tabs-widget" data-tabs>...</div>
+```
+Or Calling
 ```javascript
 $("#my-tabs-widget").tabs();
 ```
 is equivalent to calling
 ```javascript
 $("#my-tabs-widget").tabs({
+  tokens: [], // set this to the string identifier of a settings preset to use ... see : getCreateOptions().
   navigateTabsByTabKey: false, // should both tab and arrow keys be used to navigate tabs
   expandPanelOnTabFocus: true, // should a panel be opened when it's tab has focus?
   focusPanelOnTabExpand: false, // should focus be set on the first focusable item in a panel when it is opened?
@@ -116,32 +146,36 @@ $("#my-tabs-widget").tabs({
   // Allowed values for "UIX selector" properties can be any jQuery selector or a key from this components{} object.
   //  'element' is the default value for any "UIX selector", and will reference the element on which the widget is instantiated
   components: {
-    $tabList: { // The $tabList component identifies the elements that "own" all $tab components
+    tabList: { // The $tabList component identifies the elements that "own" all $tab components
       selector:"[role~='tablist']", // This "UIX Selector" value will select the elements for this component. 
       selectorContext: "element", // This "UIX Selector" value will identify the context in which the above selection is made.
-      selectorDepth: null, // This "number" value represents the "depth" at which to search "context" for "selector". 
+      selectorDepth: "", // This "number" value represents the "depth" at which to search "context" for "selector". 
                            // A value of 1+ will run `context.find(selector)` at the indicated child level. 
                            // A value of 0 will run `context.filter(selector)` returning members of the context collection.
-                           // A value of null (default) will run `context.find(selector)`
+                           // A value of null, undefined, or "" (default) will run `context.find(selector)`
       relationship: "aria-owns", // This "string" value represents the name of an [aria relationship attribute](http://www.w3.org/TR/wai-aria/states_and_properties#attrs_relationships)
       relatedby: "element", // This "UIX selector" value will identify the element on which the above relationship attribute is present.
                             // The attribute should contain a space or comma separated list of IDs representing the elements of this component.
                             // If present, the IDs found in this attribute will override the "selector..." properties in selecting elements for this component.
       classes: {
+        selected:"",
+        focus:"",
         expanded:"has-active",
       },
     },
-    $tabListItems: { // The $tabListItems component identifies the outermost "wrapper" element of each $tab component
+    tabListItems: { // The $tabListItems component identifies the outermost "wrapper" element of each $tab component
       selector:"*",
       selectorContext: "$tabList",
       selectorDepth: 1,
       relatedby: "$tabList",
       relationship: "aria-owns",
       classes: {
+        selected:"",
+        focus:"",
         expanded:"active",
       },
     },
-    $tabs: { // The $tabs component identifies the elements to be used as tabs (usually <a> links elements) 
+    tabs: { // The $tabs component identifies the elements to be used as tabs (usually <a> links elements) 
       selector:"[role~='tab']",
       selectorContext: "$tabList",
       relatedby: "$tabList",
@@ -152,7 +186,7 @@ $("#my-tabs-widget").tabs({
         expanded:"active",
       },
     },
-    $panels: { // The $panels component identifies the content elements that will be hidden and shown by eacn $tabs
+    panels: { // The $panels component identifies the content elements that will be hidden and shown by eacn $tabs
       selector:"[role~='tabpanel']",
       relatedby: "$tabs",
       relationship: "aria-controls",              
@@ -164,40 +198,34 @@ $("#my-tabs-widget").tabs({
         selectorAttributeName:'data-ajax-selector', // where to find the selector which will extract content from the documant returned by ajax()
       },
     },
-    $helpRegion: { // the $helpRegion is a planned feature, not implemented yet
+    next:{ // the $next component identifies the button element that will activate the "next" tab in the $tablist.
+      selector:"button[name='next'],[role~='button'][name='next']",
+      selectorContext: "$tabList",
+    },
+    previous:{ // the $previous component identifies the button element that will activate the "previous" tab in the $tablist.
+      selector:"button[name='previous'],[role~='button'][name='previous']",
+      selectorContext: "$tabList",
+    },
+    helpRegion: { // the $helpRegion is a planned feature, not implemented yet
       relatedby: "$tabList", 
       relationship: "aria-describedby",
     },
   },
 });
 ```
-You will see that the Tabs widget has an extensive collection of options that can be configured to suit different interaction patterns. This is illustrated in the next three widgets, which are simply different configurations of the UIX Tabs widget.
 
-### Tabs Grid Widget (`.tabsGrid()` extends `tabs`)
 
-This is a simple re-configuration of the UIX Tabs widget, that facilitates using the `UP` and `DOWN` arrow keys to navigate across rows in a grid of tabs. (a useful design pattern for the vertical tabs paradigm) It has available all the options of the Tabs widget. The only thing different are a couple default options:
+#### Accordion (Tabs Widget Configuration)
 
-Calling
-```js
-$("#my-tabsgrid-widget").tabsGrid();
+This configuration will implement your basic accordion behavior on any HTML structure. Typically Accordions differ from Tabs in three main ways: display, structure, and behavior. The display and HTML structure of typical Accordion widgets is to have *headers* and *panels* positioned "inline" (one after the other). The Typical behavior of an Accordion is not to open a panel when it's header has keyboard focus (like Tabs widgets), but rather when it is *activated* by keyboard or mouse click. The UIX Accordion widget, like any UIX widget, does not depend on or manipulate the rendered display or HTML structure. How UIX differentiates between Tabs and Accordions is by the behavior assigned. Bellow is the default configuration for a UIX Accordion widget:
+
+Adding
+```html
+<div id="my-accordion-widget" data-tabs="accordion">...</div>
 ```
-is equivalent to calling
+Or Calling
 ```js
-$("#my-tabsGrid-widget").tabs({
-  components:{
-    $tabList:{selectorDepth:3},
-  },
-   navigateTabGridByArrowKeys: true,        
-});
-```
-
-### Accordion Widget (`.accordion()` extends `tabs`)
-
-This is a simple re-configuration of the UIX Tabs widget, to implement your basic accordion behavior on any HTML structure. Typically Accordions differ from Tabs in three main ways: display, structure, and behavior. The display and HTML structure of typical Accordion widgets is to have *headers* and *panels* positioned "inline" (one after the other). The Typical behavior of an Accordion is not to open a panel when it's header has keyboard focus (like Tabs widgets), but rather when it is *activated* by keyboard or mouse click. The UIX Accordion widget, like any UIX widget, does not depend on or manipulate the rendered display or HTML structure. How UIX differentiates between Tabs and Accordions is by the behavior assigned. Bellow is the default configuration for a UIX Accordion widget:
-
-Calling
-```js
-$("#my-accordion-widget").accordion();
+$("#my-accordion-widget").tabs({tokens:["accordion"]});
 ```
 is equivalent to calling
 ```js
@@ -206,25 +234,31 @@ $("#my-accordion-widget").tabs({
   focusPanelOnTabExpand: true,
   focusTabOnPanelBlur: true,
   components:{
-    $tabList:{selectorDepth:0},
+    tabList:{selectorDepth:0},
   },
-  tabsSelfClosable: true,
-  effect: 'slide',
-  effectOptions: {duration:200},
-  queueOpeningEffect: false,
+   tabsSelfClosable: true,
+   effect: 'slide',
+   effectOptions: {duration:200},
+   queueOpeningEffect: false,
 });
 ```
 
-### Accordion Grid Widget (`.accordionGrid()` extends `accordion`)
-This is a simple re-configuration of the UIX Accordion widget. It implements the behavior for rendering a grid of expandable elements, similar to the results listing page for a [Google image search][GISH].
+#### Accordion Grid (Tabs Widget Configuration)
 
-Calling
+This configuration implements the behavior for rendering a grid of expandable elements, similar to the results listing page for a [Google image search][GISH].
+
+Adding
+```html
+<div id="my-accordionGrid-widget" data-tabs="accordionGrid">...</div>
+```
+Or Calling
 ```js
-$("#my-accordionGrid-widget").accordionGrid();
+$("#my-accordionGrid-widget").tabs({tokens:["accordionGrid"]});
 ```
 is equivalent to calling
 ```js
-$("#my-accordionGrid-widget").accordion({
+$("#my-accordionGrid-widget").tabs({
+  tokens : ["accordion"],
   navigateTabGridByArrowKeys: true,
   scrollOnOpen: true,
   updateLocationHash: true,

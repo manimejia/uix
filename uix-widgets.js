@@ -29,6 +29,18 @@
  *
  */
  
+ 
+/**
+ * UIX pluggins for jQuery:
+ * - `$().normalHref()` : normalizes the href attribute for retrieval in IE7 if it might have been set by javascript
+ * - `$().aria(attr,value,tokenOpp)` : a shortcut for calling `$().attr( 'aria-'+attr, value , tokenOpp )`
+ * - `$().attr( attr, value , tokenOpp )` : adds a third argument to enable processing of token lists
+ * - `$().attrAddToken(attr,value)` : modified `$().addClass(className)` to work with any kind of attribute
+ * - `$().attrRemoveToken(attr,value)` : modified `$().removeClass(className)` to work with any kind of attribute
+ * - `$().attrToggleToken(attr,value,stateVal)` : modified `$().toggleClass(className,stateVal)` to work with any kind of attribute
+ * - `$().attrHasToken(attr,value)` : modified `$().hasClass(className)` to work with any kind of attribute
+ *
+ */
 (function( jQuery ) {  
 
 var rclass = /[\t\r\n\f]/g;
@@ -47,15 +59,15 @@ jQuery.fn.extend({
     return this.attr('aria-'+attr,value,tokenOpp);
   },
   
-  attr: function( attr, value , tokenOpp ) {
+  attr: function( attr, value , tokenOpp , state) {
      var tokenFuncion = 
          tokenOpp === 'add' ? 'attrAddToken' :
          tokenOpp === 'remove' ? 'attrRemoveToken' :
-         tokenOpp === 'toggle' ? 'attrToggleToken' :
+         tokenOpp === 'toggle' ? 'attrToggleToken' : // uses the `state` attribute
          tokenOpp === 'has' ? 'attrHasToken' :
          null;
      if( tokenFuncion ){
-       return this[tokenFuncion](attr,value);
+       return this[tokenFuncion](attr,value,state);
      }
     return jQuery.access( this, jQuery.attr, attr, value, value !== undefined );
   },
@@ -231,14 +243,7 @@ jQuery.fn.extend({
 $.uix = $.uix || {};
 
 $.extend( $.uix, {
-  version: "0.01",
-  // selector: function(selector, context, depth){
-  //  var base = typeof(arguments[0]) === 'object' ? arguments[0] : null;
-  //  this.selector = base && base.selector ? base.selector : typeof(selector) === 'string' ? selector : '*';
-  //  this.context = base && base.context ? base.context : typeof(context) === 'string' ? context : 'element';
-  //  this.depth = base && base.depth ? base.depth : typeof(depth) === 'number' ? depth : null;
-  // }
-  
+  version: "0.01",  
   init : function($context){
     var widgetFullName = '',
         widgetName = '',
@@ -249,9 +254,16 @@ $.extend( $.uix, {
       dataAttributeName = widgetName;
       dataAttributeName = dataAttributeName.toLowerCase();
       $('[id][data-'+dataAttributeName+']',$context).each(function(){
-        var options = $(this).data(dataAttributeName); 
-        options = !options ? {} : options;
-        // $(this).removeAttr('data-'+dataAttributeName);
+        options = $.uix.getOptionsHtmlData(widgetName,this);
+        // var options = $(this).data(dataAttributeName); 
+        // options = typeof options === 'object' ? options :
+        //           typeof options === 'string' ? {"defaults":options.split(' ')} :
+        //           typeof options === 'array' ? {"defaults":options} :
+        //           {};
+        //         // $(this).removeAttr('data-'+dataAttributeName);
+        
+        // TODO : add a private and a public callback for `ajaxPanelContentLoaded` event
+        // and move the call to `foundation()` to the a site specific implementation of the public callback
         options.ajaxPanelContentLoaded = function(event,uix){
           // console.log('Calling ajaxPanelContentLoaded(event,uix)');
           // console.log('event : %O',event);
@@ -265,13 +277,80 @@ $.extend( $.uix, {
       });
     }
     return $initialized;
-  },  
+  },
+  getOptionsHtmlData : function(widgetName, element){
+    widgetName = typeof widgetName === 'string' ? widgetName : $.Widget.prototype.widgetName;
+    var data =	$(element).data() || {},
+        dataKeyMap = this.getOptionsHtmlDataKeyMap(widgetName),
+        //defaultConfiguration = this[widgetName].prototype.configurations["default"],
+        dataOptions = {};
+
+    for(key in data){
+      if(key === widgetName.toLowerCase()){
+        //dataOptions["defaults"] = data[key].split(' ');
+        $.extend(true,dataOptions,
+          typeof data[key] === 'object' ? data[key] :
+          typeof data[key] === 'string' ? {"tokens":data[key].split(' ')} :
+          typeof data[key] === 'array' ? {"tokens":data[key]} :
+          {}
+        );
+      }
+      // TODO compare key to values in dataKeyMap...
+      else if(key.indexOf(widgetName+'.') === 0){
+        dataOptions[key.substring(widgetName.length+1)] = data[key];
+      }
+      // compare key to keys in dataKeyMap ...
+      else if(dataKeyMap[key]){
+        dataOptions[dataKeyMap[key]] = data[key];
+      }
+    }
+    return dataOptions;
+  },
+  getOptionsHtmlDataKeyMap : function(widget, options, path){
+    widget  = widget instanceof $.Widget ? widget : 
+              typeof widget === 'string' ? $.uix[widget].prototype :
+              $.Widget.prototype,
+    options = typeof options === 'object' ? options :
+              widget.configurations ? widget.configurations["default"] :
+              {} , 
+    path    = path && path.length ? path : [widget.widgetName.toLowerCase()];
+    var dataKeyMap = {},
+        dataKey = "";
+    for(key in options){
+      if(typeof options[key] === "object"){ 
+        $.extend(dataKeyMap,this.getOptionsHtmlDataKeyMap(widget,options[key],path.concat(key)));
+      }else{
+        $.each(path.concat(key),function(index,value){
+          dataKey = index === 0 ? value : dataKey + value.charAt(0).toUpperCase() + value.slice(1);//.toLowerCase();
+        });
+        dataKeyMap[dataKey] = path.concat(key).slice(1).join('.');
+      }
+    }
+    return dataKeyMap;
+  },
+  getWidgetConfiguration : function(widget,tokens){
+    widget = typeof widget === 'string' && $.uix[widget] ? $.uix[widget].prototype : 
+             typeof widget === 'object' && widget.options && widget.configurations ? widget :
+             {};
+    tokens = tokens && tokens.length ? tokens : widget.options.tokens || [];
+    var configurations = widget.configurations || {},
+        configurationSet = {},
+        widgetConfiguration = {};
+    for(index in tokens){
+      configurationSet = configurations[tokens[index]] || {};
+      if(configurationSet.tokens && configurationSet.tokens.length){
+        $.extend(true,configurationSet,$.uix.getWidgetConfiguration(widget,configurationSet.tokens));
+      }
+      $.extend(true,widgetConfiguration,configurationSet);
+    }
+    return widgetConfiguration;
+  },
   defaults : function(widgetName){
-    return $.uix[widgetName].prototype.defaults;
+    //return $.uix[widgetName].prototype.defaults;
   },
   widgets : function(){
     return Object.keys($.uix).filter(function(key){
-      return $.uix[key] && $.uix[key].prototype ? $.uix[key].prototype.hasOwnProperty('widgetName') : false;
+      return $.uix[key] && $.uix[key].prototype ? $.uix[key].prototype instanceof $.Widget : false;
     });
   },
   scrollToElement : function(elementId,updateLocation){
@@ -314,12 +393,172 @@ $.extend( $.uix, {
     };
   })(),
   
+  templates : {
+    componentSelector : {
+       selector         : "*",
+       selectorContext  : "element",
+       selectorDepth    : "",
+       relatedby        : "",
+       relationship     : "",
+    },
+    componentClasses : {
+       created      :  "", 
+       initialized  :  "", 
+       focused      :  "", 
+       selected     :  "", 
+    },
+  },
 });
 
-$.widget( "uix.tabs", {
-  version: "0.01",
-  options: {
-    'default': '', // set this to the string identifier of a settings preset to use ... see : getCreateOptions().
+
+/*
+Ajaxfailed
+data-tabs="slider foundation"
+data-tabs-behavior-navigate-by-tab-key=""
+data-tabs-effect-panel-expanded=""
+data-tabs-effect-panel-expanded-options=""
+data-tabs-effect-panel-expanded-delay=""
+data-tabs-component-tablist-depth="0"
+data-tabs-class-tablist-expanded="current"
+data-tabs-attribute-panel-ajax-url=""
+data-tabs-attribute-panel-ajax-selector=""
+
+include:[] // Array[string] array of tokens
+expand:[] // Array[string]
+
+behaviorTabKeyNavigation
+behaviorGridNavigation
+behaviorLoopNavigation
+behaviorExpandOnTabFocus
+behaviorFocusPanelOnExpand
+behaviorFocusTabOnPanelBlur
+behaviorScrollPageOnExpand
+behaviorExpandMultiple
+behaviorClosable
+behaviorUpdateLocationHash
+behaviorReadFromLocationHash
+
+effectPanelExpand
+effectPanelExpandOptions
+effectPanelExpandDelay
+effectSlideshow
+effectSlideshowOptions
+effectSlideshowDelay
+
+componentTablistSelector
+componentTablistDepth
+componentTablistContext
+componentTablistRelatedby
+componentTablistRelationship
+
+componentTablistitemSelector
+componentTablistitemDepth
+componentTablistitemContext
+componentTablistitemRelatedby
+componentTablistitemRelationship
+
+componentTabSelector
+componentTabDepth
+componentTabContext
+componentTabRelatedby
+componentTabRelationship
+
+componentPanelSelector
+componentPanelDepth
+componentPanelContext
+componentPanelRelatedby
+componentPanelRelationship
+
+componentPreviousSelector
+componentPreviousDepth
+componentPreviousContext
+componentPreviousRelatedby
+componentPreviousRelationship
+
+componentNextSelector
+componentNextDepth
+componentNextContext
+componentNextRelatedby
+componentNextRelationship
+
+componentHelplistSelector
+componentHelplistDepth
+componentHelplistContext
+componentHelplistRelatedby
+componentHelplistRelationship
+
+classTablistFocused
+classTablistSelected
+classTablistExpanded
+classTablistCollapsed
+classTablistAjaxbusy
+classTablistAjaxloaded
+classTablistAjaxfailed
+
+classTablistitemFocused
+classTablistitemSelected
+classTablistitemExpanded
+classTablistitemCollapsed
+classTablistitemAjaxbusy
+classTablistitemAjaxloaded
+classTablistitemAjaxfailed
+classTablistitemNext
+classTablistitemPrevious
+
+classTabFocused
+classTabSelected
+classTabExpanded
+classTabCollapsed
+classTabAjaxbusy
+classTabAjaxloaded
+classTabAjaxfailed
+classTabNext
+classTabPrevious
+
+classPanelFocused
+classPanelSelected
+classPanelExpanded
+classPanelCollapsed
+classPanelAjaxbusy
+classPanelAjaxloaded
+classPanelAjaxfailed
+classPanelNext
+classPanelPrevious
+    
+helpNavigateByArrowKeysContent
+helpNavigateByArrowKeysCondition
+helpNavigateByArrowKeysSort
+    
+onTabFocused
+onTabSelected
+onTabExpanded
+onTabCollapsed
+onTabAjaxBusy
+onTabAjaxLoaded
+onTabAjaxFailed
+
+onSyncInterval
+onSyncIntervalDuration
+
+*/
+
+
+$.widget( "uix.tabs", {version: "0.01"});
+
+$.uix.tabs.prototype.templates = $.extend(true, {} , $.uix.templates , {
+  componentClasses : {
+    expanded     :  "",
+    collapsed    :  "",
+    ajaxbusy     :  "",
+    ajaxloaded   :  "",
+    ajaxfailed   :  "",
+  },
+});
+
+
+$.uix.tabs.prototype.configurations = {
+  "default":{
+    tokens: [], // set this to the string identifier of a settings preset to use ... see : getCreateOptions().
     navigateTabsByTabKey: false, // should both tab and arrow keys be used to navigate tabs
     expandPanelOnTabFocus: true, // should a panel be opened when it's tab has focus?
     focusPanelOnTabExpand: false, // should focus be set on the first focusable item in a panel when it is opened?
@@ -352,32 +591,36 @@ $.widget( "uix.tabs", {
     // Allowed values for "UIX selector" properties can be any jQuery selector or a key from this components{} object.
     //  'element' is the default value for any "UIX selector", and will reference the element on which the widget is instantiated
     components: {
-      $tabList: { // The $tabList component identifies the elements that "own" all $tab components
+      tabList: { // The $tabList component identifies the elements that "own" all $tab components
         selector:"[role~='tablist']", // This "UIX Selector" value will select the elements for this component. 
         selectorContext: "element", // This "UIX Selector" value will identify the context in which the above selection is made.
-        selectorDepth: null, // This "number" value represents the "depth" at which to search "context" for "selector". 
+        selectorDepth: "", // This "number" value represents the "depth" at which to search "context" for "selector". 
                              // A value of 1+ will run `context.find(selector)` at the indicated child level. 
                              // A value of 0 will run `context.filter(selector)` returning members of the context collection.
-                             // A value of null (default) will run `context.find(selector)`
+                             // A value of null, undefined, or "" (default) will run `context.find(selector)`
         relationship: "aria-owns", // This "string" value represents the name of an [aria relationship attribute](http://www.w3.org/TR/wai-aria/states_and_properties#attrs_relationships)
         relatedby: "element", // This "UIX selector" value will identify the element on which the above relationship attribute is present.
                               // The attribute should contain a space or comma separated list of IDs representing the elements of this component.
                               // If present, the IDs found in this attribute will override the "selector..." properties in selecting elements for this component.
         classes: {
+          selected:"",
+          focus:"",
           expanded:"has-active",
         },
       },
-      $tabListItems: { // The $tabListItems component identifies the outermost "wrapper" element of each $tab component
+      tabListItems: { // The $tabListItems component identifies the outermost "wrapper" element of each $tab component
         selector:"*",
         selectorContext: "$tabList",
         selectorDepth: 1,
         relatedby: "$tabList",
         relationship: "aria-owns",
         classes: {
+          selected:"",
+          focus:"",
           expanded:"active",
         },
       },
-      $tabs: { // The $tabs component identifies the elements to be used as tabs (usually <a> links elements) 
+      tabs: { // The $tabs component identifies the elements to be used as tabs (usually <a> links elements) 
         selector:"[role~='tab']",
         selectorContext: "$tabList",
         relatedby: "$tabList",
@@ -388,7 +631,7 @@ $.widget( "uix.tabs", {
           expanded:"active",
         },
       },
-      $panels: { // The $panels component identifies the content elements that will be hidden and shown by eacn $tabs
+      panels: { // The $panels component identifies the content elements that will be hidden and shown by eacn $tabs
         selector:"[role~='tabpanel']",
         relatedby: "$tabs",
         relationship: "aria-controls",              
@@ -400,7 +643,13 @@ $.widget( "uix.tabs", {
           selectorAttributeName:'data-ajax-selector', // where to find the selector which will extract content from the documant returned by ajax()
         },
       },
-      $helpRegion: { // the $helpRegion is a planned feature, not implemented yet
+      next:{ // the $next component identifies the button element that will activate the "next" tab in the $tablist.
+        selector:"button[name='next'],[role~='button'][name='next']",
+      },
+      previous:{ // the $previous component identifies the button element that will activate the "previous" tab in the $tablist.
+        selector:"button[name='previous'],[role~='button'][name='previous']",
+      },
+      helpRegion: { // the $helpRegion is a planned feature, not implemented yet
         relatedby: "$tabList", 
         relationship: "aria-describedby",
       },
@@ -458,35 +707,27 @@ $.widget( "uix.tabs", {
         sort:100,
       },
     },
-  },
-});
-
-$.widget( "uix.tabsGrid", $.uix.tabs, {
-  defaults : {
+  },// end default defaults
+  "tabsGrid" : {
     components:{
-      $tabList:{selectorDepth:3},
+      tabList:{selectorDepth:3},
     },
      navigateTabGridByArrowKeys: true,        
-  },
-});
-    
-$.widget( "uix.accordion", $.uix.tabs, {
-  defaults: {
+  },// end tabsGrid defaults
+  "accordion": {
     expandPanelOnTabFocus: false,
     focusPanelOnTabExpand: true,
     focusTabOnPanelBlur: true,
     components:{
-      $tabList:{selectorDepth:0},
+      tabList:{selectorDepth:0},
     },
      tabsSelfClosable: true,
      effect: 'slide',
      effectOptions: {duration:200},
      queueOpeningEffect: false,
-  },
-});
-
-$.widget( "uix.accordiongrid", $.uix.tabs,{
-  defaults : $.extend(true,{},$.uix.accordion.prototype.defaults,{
+  },// end accordio defaults
+  "accordionGrid" : {
+    tokens : ["accordion"],
     navigateTabGridByArrowKeys: true,
     scrollOnOpen: true,
     updateLocationHash: true,
@@ -504,28 +745,146 @@ $.widget( "uix.accordiongrid", $.uix.tabs,{
         });
       },
     syncInterval: 500,
-  }),
+  },
+  "slider" : {
+    navigateTabsAsCircularLoop: true, 
+    effect: 'slide',
+    effectOptions: {
+          duration:200,
+        },
+    queueOpeningEffect: false,
+  },
+};
+
+
+
+$.each($.uix.tabs.prototype.configurations["default"].components, function(key,obj){
+  obj = $.extend(true, {}, $.uix.tabs.prototype.templates.componentSelector, obj);
+  if(obj.classes){
+    obj.classes = $.extend(true, {}, $.uix.tabs.prototype.templates.componentClasses, obj.classes);
+  }
+  $.uix.tabs.prototype.configurations["default"].components[key] = obj;
 });
+
+
+// $.widget( "uix.tabsGrid", $.uix.tabs, {
+//   defaults : {
+//     components:{
+//       $tabList:{selectorDepth:3},
+//     },
+//      navigateTabGridByArrowKeys: true,        
+//   },
+// });
+//     
+// $.widget( "uix.accordion", $.uix.tabs, {
+//   defaults: {
+//     expandPanelOnTabFocus: false,
+//     focusPanelOnTabExpand: true,
+//     focusTabOnPanelBlur: true,
+//     components:{
+//       $tabList:{selectorDepth:0},
+//     },
+//      tabsSelfClosable: true,
+//      effect: 'slide',
+//      effectOptions: {duration:200},
+//      queueOpeningEffect: false,
+//   },
+// });
+// 
+// $.widget( "uix.accordiongrid", $.uix.tabs,{
+//   defaults : $.extend(true,{},$.uix.accordion.prototype.defaults,{
+//     navigateTabGridByArrowKeys: true,
+//     scrollOnOpen: true,
+//     updateLocationHash: true,
+//     effectOptions: {
+//           duration:200,
+//           step : function(now,fx){
+//             if(fx.prop == 'height')
+//             $(fx.elem).parent().css('padding-bottom',now+'px');
+//           },
+//         },
+//     sync: function(tabgroup){
+//         tabgroup.$panels.filter('[aria-hidden="false"]').each(function(){
+//             var tabpanelHeight = $(this).height();
+//             $(this).parent().css('padding-bottom',tabpanelHeight+'px');
+//         });
+//       },
+//     syncInterval: 500,
+//   }),
+// });
+// 
+// $.widget( "uix.uixslider", $.uix.tabs,{
+//   navigateTabsAsCircularLoop: true, 
+//   effect: 'slide',
+//   effectOptions: {
+//         duration:200,
+//       },
+//   queueOpeningEffect: false,
+// });
+
+
+// 
+// $.uix.createWidgetVariant = function(widgetName,variantName,options,components,helptext){
+//   var variant = $.widget( "uix."+variantName, $.uix[widgetName],options);
+//   $.widget.extend(variant.prototype.components,components);
+//   $.widget.extend(variant.prototype.helptext,helptext);
+//   $.fn[variantName] = function(instance,iOptions,iComponents,iHelptext){
+//     $.uix._buildWidgetInstance = function(instance,1Options,iComponents,iHelptext);
+//   }
+// }
+// $.uix._buildWidgetInstance = function(instance,options,components,helptext){
+//   
+// }
 
 $.uix.tabs.prototype._getCreateOptions = function(){
   // console.log(this);
   // console.trace();
-  var _super = typeof(this._super) === 'function' ? this._super : function(){return{}};
-  return $.extend(true,{},_super(),this.defaults);
+  // var _super = typeof(this._super) === 'function' ? this._super : function(){return{}};
+  // return $.extend(true,{},_super(),this.defaults);
 }
 
-
+/**
+ * In UIX widgets, `this.options` object is populated by `this._create()` funcition, 
+ * instead of by `this._createWidget()` function as defined by jquery.ui.
+ * This is because UIX widgets have additional functionalities that UI widgets do not, namely:
+ *  -1 UIX widgets may be instantiated and have "instance options" set by special data attributes 
+ *     on the target HTML element
+ *  -2 UIX widgets may have "default" options set, in addition to the widget's "default" options, 
+ *     by referencing any of the keys from `this.defaults` as an array of strings in `this.options.defaults`
+ * These additional features mean that the strings in `this.options.defaults` must be resolved 
+ * as `this.defaults` options and added as values to `this.options` before the latter is then 
+ * extended by the "instance options". To to get the "instance options" from the HTML data attributes, 
+ * UIX widgets use `this._getCreateOptions()` function, which is called by `this._createWidget()` 
+ * right before calling `this._create()`. Therefore, at the time `this._create()` is called, 
+ * `this.options` should only contain the "instance options", so that all "defaults" (including 
+ * widget default defaults) can be resolved and then extended upon by `this.options`.
+ *
+ * @see `$.Widget.prototype._createWidget()` function in `/jquery-ui.js` 
+ *      for how `this.options` object is instatiated initially. 
+ */ 
 $.uix.tabs.prototype._create = function() { 
+  
+  var instanceOptions = this.options;
+  var defaultConfiguration = this.configurations["default"];
+  var widgetConfiguration = $.uix.getWidgetConfiguration(this); // resolve this.options.tokens array of configuration keys
+  this.options = $.extend(true,{},defaultConfiguration,widgetConfiguration);
+  // using this.option() function allows instance options to be set using dot notation {"object.key":"value"}
+  for(optionKey in instanceOptions){
+    this.option(optionKey,instanceOptions[optionKey]);
+  }
+  
   // define the widget properties 
   if(this.options.tabDepth < 1)this.options.tabDepth = 1;
   if(this.options.tabPanelDepth < 1)this.options.tabPanelDepth = 1;
 
   // this.keys = new keyCodes(); // keycodes needed for event handlers 
-  this.$tabList = this._createComponent('$tabList');
-  this.$tabListItems = this._createComponent('$tabListItems');
-  this.$tabs = this._createComponent('$tabs');
-  this.$panels = this._createComponent('$panels');
-  this.$helpRegion = this._createComponent('$helpRegion');
+  this.$tabList = this._createComponent('tabList');
+  this.$tabListItems = this._createComponent('tabListItems');
+  this.$tabs = this._createComponent('tabs');
+  this.$panels = this._createComponent('panels');
+  this.$next = this._createComponent('next');
+  this.$previous = this._createComponent('previous');
+  this.$helpRegion = this._createComponent('helpRegion');
 
   this.tabClick = false; // flag to track touch click events
 
@@ -617,7 +976,7 @@ $.uix.tabs.prototype._createComponent = function(key){
     $context = this.getComponent(componentOptions.selectorContext);
     // console.log($selector);
     // console.log($context);
-    depth = typeof componentOptions.selectorDepth === "number" ? componentOptions.selectorDepth : null;
+    depth = typeof componentOptions.selectorDepth === "number" ? componentOptions.selectorDepth : "";
     if(depth > 0 ){
       // componentOptions children at a specified depth
       // console.log('  querying children of "'+componentOptions.selectorContext+'" for "'+componentOptions.selector+'" at a depth of '+depth );
@@ -635,7 +994,7 @@ $.uix.tabs.prototype._createComponent = function(key){
       // console.log('  filtering "'+componentOptions.selectorContext+'" for "'+componentOptions.selector+'"' );
       $components = $context.filter($selector);
     }
-    if(depth == null){
+    else if(depth == null || depth == ""){
       // componentOptions all children
       // console.log(' querying all children of "'+componentOptions.selectorContext+'" for "'+componentOptions.selector+'"' );
       $components = $context.find($selector);
@@ -682,16 +1041,39 @@ $.uix.tabs.prototype._processComponents = function() {
       if($tablist.length === 0){
         // TODO which tablist should the tab be owned by
         // this is not a foolproof check for the closest tablist parent or aunt
-        $tablist = $tab.closest(':has([role="tablist"])').find('[role="tablist"]').first();
+        $tablist = $tab.closest(':has([role~="tablist"])').find('[role~="tablist"]').first();
         $tablist.aria('owns',$tab.id);
       }
-      if($tab.attr('[aria-controls]')){
-        if($tab.attr('href')) $tab.attr('href','#'+$tab.attr('aria-controls'));
-        if($tab.attr('aria-expanded') != 'true') $tab.attr('aria-expanded','false');
+      if($tab.aria('controls')){
+        if($tab.attr('href')) $tab.attr('href','#'+$tab.aria('controls'));
+        if($tab.aria('expanded') != 'true') $tab.aria('expanded','false');
         widget.setTabIndex($tab);
       }
     });
  
+  // process next and previous buttons, if they exist
+  if(widget.$next.length){
+    widget.$next.click(function(event){
+      var $currentTab = widget.getExpandedTabs();
+      var $nextTab = widget.getNextTab($currentTab);
+      // console.group('Calling widget.$next.click() :');
+      // console.log('$currentTab : %O',$currentTab);
+      // console.log('$nextTab : %O',$nextTab);
+      // console.groupEnd();
+      widget.switchTabs($currentTab,$nextTab);
+      });
+  }
+  if(widget.$previous.length){
+    widget.$previous.click(function(event){
+      var $currentTab = widget.getExpandedTabs();
+      var $previousTab = widget.getPreviousTab($currentTab);
+      // console.group('Calling widget.$previous.click() :');
+      // console.log('$currentTab : %O',$currentTab);
+      // console.log('$previousTab : %O',$previousTab);
+      // console.groupEnd();
+      widget.switchTabs($currentTab,$previousTab);
+      });
+  }
   // if there is a tab to activate, 
   // set focus to it, expand it's panel, and set tabindex
   if(expandedId){
@@ -773,17 +1155,24 @@ $.uix.tabs.prototype.switchTabs = function($curTab, $newTab, expand) {
 // @return N/A 
 // 
 $.uix.tabs.prototype.togglePanel = function($tab,expand) { 
+  //console.group('Calling togglePanel($tab,expand):');
   if(this.$tabs.index($tab) === -1) return false;
   expand = expand == null ? null : expand ? true : false;
+  //console.log('$tab : %O',$tab);
+  //console.log('expand : ',expand);
   var widget = this;
   var $tabWrapper = this.$tabListItems.has($tab);
-  var $panel = this.element.find('#' + $tab.attr('aria-controls')); 
-  var panelHidden = $panel.attr('aria-hidden') == 'true' ? true : false ;
-  var panelId = $panel.attr('id');
+  var $panel = this.getTabPanel($tab); 
+  var panelHidden = this.isPanelHidden($panel);
+  var panelId = $panel.id;
   // var panelLoadUri = $panel.attr('data-load');
   // var effectOptions = $.extend(true, {}, this.options.effectOptions);
   // var openingDelay = 0;
   var panelsToClose = [];
+  // console.log('$tabWrapper : %O',$tabWrapper);
+  // console.log('$panel : %O',$panel);
+  // console.log('panelHidden : ',panelHidden);
+  // console.log('tabsSelfClosable : ',this.options.tabsSelfClosable);
 
   if(panelHidden == false && this.options.tabsSelfClosable == true && !expand){
      $panelsToClose = $panel;
@@ -791,6 +1180,7 @@ $.uix.tabs.prototype.togglePanel = function($tab,expand) {
   }else if(panelHidden == true && this.options.tabsMultiSelectable == false){
      $panelsToClose = this.getExpandedPanels();
   }
+  //console.log('$panelsToClose : %O',$panelsToClose);
 
   if($panelsToClose.length > 0){ 
     if($panelsToClose.is($panel) && widget.options.scrollOnOpen){ 
@@ -811,39 +1201,51 @@ $.uix.tabs.prototype.togglePanel = function($tab,expand) {
     //$panel.attr('aria-hidden', 'false').addClass('active'); 
     //$panel.slideDown(100); 
   }
-
+  //console.groupEnd();
 } // end togglePanel() 
 
 $.uix.tabs.prototype.showPanel = function($panel){
+  console.group('calling : showPanel()') 
   var widget = this,
-      $tab = this.getPanelTab($panel),
-      effectOptions = $.extend(true, {}, this.options.effectOptions),
+      $tab = widget.getPanelTab($panel),
+      tabClass = widget.options.components.tabs.classes.expanded || 'expanded',
+      panelClass = widget.options.components.panels.classes.expanded || 'expanded',
+      effectOptions = $.extend(true, {}, widget.options.effectOptions),
       // TODO should use animation API to check if closing animation is still running instead of guessing...
-      openingDelay =  this.getExpandedPanels().length > 0 && 
+      openingDelay =  widget.getExpandedPanels().length > 0 && 
                       widget.options.queueOpeningEffect === true ? 
                       effectOptions.duration || 400 : 0;
-
+  console.log('widget : %O',widget);
+  console.log('tabClass : ',tabClass);
   effectOptions.complete = function(){
      if(widget.options.scrollOnOpen) $.uix.scrollToElement($panel,false);
      if(widget.options.updateLocationHash) window.location.hash = $panel.attr('id');
-     $panel.attr('aria-hidden', 'false').addClass('active');
-     $tab.attr('aria-expanded', 'true').attr('aria-selected', 'true').addClass('active');//.attr('tabindex', '0'); 
+     $panel.attr('aria-hidden', 'false').toggleClass(panelClass,true);
+     $tab.attr('aria-expanded', 'true').attr('aria-selected', 'true').toggleClass(tabClass,true);//.attr('tabindex', '0'); 
      //if(widget.options.focusPanelOnTabExpand) $panel.find(':focusable').first().focus();
     if(widget.options.focusPanelOnTabExpand) {
-      $panel.focus();
+      widget.setTabIndex($panel,0);
+      $($panel).focus();
     }
    };
   this.effectShow($panel,effectOptions,openingDelay);
+  console.groupEnd();
 }
 
 $.uix.tabs.prototype.hidePanels = function($panels){
   var widget = this;
-  var effectOptions = $.extend(true, {}, this.options.effectOptions);
+      tabClass = widget.options.components.tabs.classes.expanded || 'expanded',
+      panelClass = widget.options.components.panels.classes.expanded || 'expanded',
+      effectOptions = $.extend(true, {}, widget.options.effectOptions);
+  if(widget.options.focusPanelOnTabExpand) {
+    $($panels).blur();
+    widget.setTabIndex($panels,-1);
+  }
   effectOptions.complete = function(){
       var $thisPanel = $(this);
-      var $thisPanelTab = widget.getPanelTab($thisPanel);
-      $thisPanel.attr('aria-hidden', 'true').removeClass('active');
-      $thisPanelTab.attr('aria-expanded', 'false').attr('aria-selected', 'false').removeClass('active');//.attr('tabindex', '-1'); 
+      var $thisTab = widget.getPanelTab($thisPanel);
+      $thisPanel.attr('aria-hidden', 'true').toggleClass(panelClass,false);
+      $thisTab.attr('aria-expanded', 'false').attr('aria-selected', 'false').toggleClass(tabClass,false);//.attr('tabindex', '-1'); 
     };
   this.effectHide($panels,effectOptions);
 }
@@ -973,28 +1375,36 @@ $.uix.tabs.prototype.effectFunction = function(show){
     $.uix.tabs.prototype.getTabPanel = function($tab){
       return this.$panels.filter('#'+$tab.attr('aria-controls'));
     }
-    $.uix.tabs.prototype.setTabIndex = function($tab,tabindex){
-      tabindex = tabindex === true || tabindex === 0 || this.options.navigateBytabKey || this.isTabExpanded($tab) ? 0 : -1;
-      $tab.attr('tabindex', tabindex);
+    $.uix.tabs.prototype.getExpandedTabs = function(){
+      return this.$tabs.filter('[aria-expanded="true"]');
+    }
+    $.uix.tabs.prototype.setTabIndex = function($element,tabindex){
+      tabindex = tabindex >= 0 ? tabindex :
+                 tabindex === true ? 0 :
+                 this.$tabs.has($element) && this.options.navigateBytabKey || this.isTabExpanded($element) ? 0 : 
+                 -1;
+      $element.tabIndex = tabindex;
       return this;
     }
     $.uix.tabs.prototype.getTabAnchor = function($tab){
       return $tab.is('a') ? $tab.first() : $tab.find('a').first();
     }
     $.uix.tabs.prototype.getAjaxPanelContentUrl = function($panel){
-      var attributeName = this.options.components.$panels.ajax.urlAttributeName;
+      var attributeName = this.options.components.panels.ajax.urlAttributeName;
       return  $panel.attr(attributeName) || 
               this.getPanelTab($panel).attr(attributeName);
     }
     $.uix.tabs.prototype.getAjaxPanelContentSelector = function($panel){
-      var attributeName = this.options.components.$panels.ajax.selectorAttributeName;
+      var attributeName = this.options.components.panels.ajax.selectorAttributeName;
       return  $panel.attr(attributeName) || 
               this.getPanelTab($panel).attr(attributeName);
     }
     $.uix.tabs.prototype.isTabExpanded = function($tab){
+      $tab = $tab instanceof jQuery ? $tab : $($tab);
       return $tab.attr('aria-expanded') == 'true' ? true : false;
     }
     $.uix.tabs.prototype.isPanelHidden = function($panel){
+      $panel = $panel instanceof jQuery ? $panel : $($panel);
       return $panel.attr('aria-hidden') == 'true' ? true : false;
     }
     $.uix.tabs.prototype.isTabPanelLoaded = function($tab){
@@ -1193,6 +1603,9 @@ $.uix.tabs.prototype.effectFunction = function(show){
       this.$panels.focus(function(e) { 
         return widget._handlePanelFocus($(this), e); 
       });
+      this.$panels.blur(function(e) { 
+        return widget.getPanelTab($(this)).focus(); 
+      }); 
 
     } // end _bindHandlers() 
 
@@ -1207,6 +1620,10 @@ $.uix.tabs.prototype.effectFunction = function(show){
     // @return (boolean) Returns true if propagating; false if consuming event 
     // 
     $.uix.tabs.prototype._handleTabKeyDown = function($tab, e) { 
+      console.group('Calling _handleTabKeyDown($tab,event)');
+      console.log('$tab : %O',$tab);
+      console.log('event : %O',e);
+      console.groupEnd();
       if (e.altKey) { 
         // do nothing 
         return true; 
@@ -1408,6 +1825,10 @@ $.uix.tabs.prototype.effectFunction = function(show){
     // @return (boolean) returns true 
     // 
     $.uix.tabs.prototype._handleTabClick = function($tab, e) { 
+      console.group('Calling _handleTabClick($tab,event)');
+      console.log('$tab : %O',$tab);
+      console.log('event : %O',e);
+      console.groupEnd();
 
       // remove all tabs from the tab order 
       //this.$tabs.attr('tabindex', '-1'); 
@@ -1489,7 +1910,7 @@ $.uix.tabs.prototype.effectFunction = function(show){
       } 
 
       // get the jQuery object of the tab 
-      var $tab = this.getTabFromPanel($panel); 
+      var $tab = this.getPanelTab($panel); 
 
       switch (e.keyCode) { 
         case $.ui.keyCode.TAB: { 
